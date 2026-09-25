@@ -42,5 +42,10 @@ namespace Aplicacion_API.Servicios
         {
             return await _categoriaRepositorio.Delete(id);
         }
+
+        public async Task<Categoria?> GetCategoriaByIdAsync(int id)
+        {
+            return await _categoriaRepositorio.FindFirstOrDefaultAsync(x => x.Id == id);
+        }
     }
 }

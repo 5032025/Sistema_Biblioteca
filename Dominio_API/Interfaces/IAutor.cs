@@ -7,7 +7,7 @@ namespace Dominio_API.Interfaces
 {
     public interface IAutor : IBase<Autor>
     {
-        Task AddBookToAuthorAsync(AutorLibro autorLibro);
+        
         Task<Autor?> GetAuthorWithBooks(int id);
     }
 }

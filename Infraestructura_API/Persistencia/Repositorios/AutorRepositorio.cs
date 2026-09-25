@@ -1,18 +1,17 @@
 ﻿using Dominio_API.Clases;
 using Dominio_API.Interfaces;
+using Microsoft.AspNetCore.Http; 
 using Microsoft.EntityFrameworkCore;
 
 namespace Infraestructura_API.Persistencia.Repositorios
 {
     public class AutorRepositorio : RepositorioBase<Autor>, IAutor
     {
-        public AutorRepositorio(AppDbContext context) : base(context) { }
+       
+        public AutorRepositorio(AppDbContext context, IHttpContextAccessor httpContextAccessor)
+            : base(context, httpContextAccessor) { }
 
-        public async Task AddBookToAuthorAsync(AutorLibro autorLibro)
-        {
-            await _context.Set<AutorLibro>().AddAsync(autorLibro);
-            await _context.SaveChangesAsync();
-        }
+       
 
         public async Task<Autor?> GetAuthorWithBooks(int id)
         {

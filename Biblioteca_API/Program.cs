@@ -37,29 +37,34 @@ builder.Services.AddScoped<AutorServicio>();
 builder.Services.AddScoped<CategoriaServicio>();
 builder.Services.AddScoped<LibroServicio>();
 builder.Services.AddScoped<ReservaServicio>();
-builder.Services.AddScoped<IJwt, JWTService>(); // Asegúrate de incluir el servicio que genera el Token JWT si aplica
+builder.Services.AddScoped<IJwt, JWTService>(); 
+builder.Services.AddHttpContextAccessor();
 
-// 4. Configuración de Autenticación JWT (Debe ir ANTES de builder.Build())
-builder.Services.AddAuthentication(options =>
-{
+// 4. Configuración de Autenticación JWT corregida
+builder.Services.AddAuthentication(options => {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
-{
+.AddJwtBearer(options => {
     options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["JwtIssuer"],
-        ValidAudience = builder.Configuration["JwtAudience"],
+       
+        ValidIssuer = builder.Configuration["JwtSettings:JwtIssuer"],
+        ValidAudience = builder.Configuration["JwtSettings:JwtAudience"],
         IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["JwtKey"] ?? "ClaveSuperSecretaDeRespaldo123!"))
+            Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:JwtKey"] ?? "ClaveSuperSecretaDeRespaldo123!"))
     };
 });
 
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -99,25 +104,26 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        // 2. Crear el usuario Administrador por defecto usando tu repositorio si no existe
         string adminEmail = "admin@biblioteca.com";
-        bool existeAdmin = await usuarioRepositorio.UserExists(adminEmail);
+        var usuarioAdmin = await usuarioRepositorio.GetUserByEmail(adminEmail); 
 
-        if (!existeAdmin)
+        if (usuarioAdmin == null)
         {
             var nuevoAdmin = new Dominio_API.Clases.Usuario
             {
                 Email = adminEmail,
-                Password = "Admin123*",
+                Password = "Admin123*", // Limpia los espacios extra
                 FirstName = "Administrador",
                 LastName = "Sistema"
             };
 
-            var usuarioCreado = await usuarioRepositorio.CreateUser(nuevoAdmin);
-            if (usuarioCreado != null)
-            {
-                await usuarioRepositorio.AddToRoleAsync(usuarioCreado, "Admin");
-            }
+            usuarioAdmin = await usuarioRepositorio.CreateUser(nuevoAdmin);
+        }
+
+        // Asegurar siempre que tenga el rol de Admin sin importar si ya existía
+        if (usuarioAdmin != null)
+        {
+            await usuarioRepositorio.AddToRoleAsync(usuarioAdmin, "Admin");
         }
     }
     catch (Exception ex)

@@ -1,12 +1,15 @@
 ﻿using Dominio_API.Clases;
 using Dominio_API.Interfaces;
+using Microsoft.AspNetCore.Http; 
 using Microsoft.EntityFrameworkCore;
 
 namespace Infraestructura_API.Persistencia.Repositorios
 {
     public class ReservaRepositorio : RepositorioBase<Reserva>, IReserva
     {
-        public ReservaRepositorio(AppDbContext context) : base(context) { }
+        
+        public ReservaRepositorio(AppDbContext context, IHttpContextAccessor httpContextAccessor)
+            : base(context, httpContextAccessor) { }
 
         public async Task AddBookToReserve(LibroReserva libroReserva)
         {

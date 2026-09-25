@@ -21,15 +21,22 @@ namespace Infraestructura_API.Persistencia.Repositorios
 
         public async Task<Usuario> AddToRoleAsync(Usuario user, string roleName)
         {
+            // Buscamos al usuario de Identity por correo
             var userDb = await _userManager.FindByEmailAsync(user.Email);
-            var result = await _userManager.AddToRoleAsync(userDb, roleName);
+
+            // Protección para evitar que explote si por alguna razón viene nulo
+            if (userDb != null)
+            {
+                await _userManager.AddToRoleAsync(userDb, roleName);
+            }
+
             return user;
         }
 
-        public async Task<bool> CheckPasswordAsync(string userId, string password)
+        public async Task<bool> CheckPasswordAsync(string email, string password)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-
+          
+            var user = await _userManager.FindByEmailAsync(email);
 
             return user != null && await _userManager.CheckPasswordAsync(user, password);
         }

@@ -42,5 +42,15 @@ namespace Aplicacion_API.Servicios
         {
             return await _libroRepositorio.Delete(id);
         }
+
+        public async Task AddAuthorsToBookAsync(AutorLibro autorLibro)
+        {
+            await _libroRepositorio.AddAuthorsToBookAsync(autorLibro);
+        }
+
+        public async Task AddCategoriesToBookAsync(LibroCategoria libroCategoria)
+        {
+            await _libroRepositorio.AddCategoriesToBookAsync(libroCategoria);
+        }
     }
 }

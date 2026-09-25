@@ -1,6 +1,7 @@
 ﻿using Biblioteca_API.DTOs;
 using BookApplication.Services;
 using Dominio_API.Clases;
+using Infraestructura_API.Seguridad;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Biblioteca_API.Controllers
@@ -36,23 +37,16 @@ namespace Biblioteca_API.Controllers
         }
 
         [HttpPost("Login")]
-        public async Task<IActionResult> Login(LoginDto loginDto)
+        public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            try
-            {
-                var result = await _authService.Login(loginDto.Email, loginDto.Password, loginDto.RemenberMe);
+            var result = await _authService.Login(loginDto.Email, loginDto.Password, loginDto.RememberMe);
 
-                if (string.IsNullOrEmpty(result))
-                {
-                    return Unauthorized(new { message = "Credenciales incorrectas." });
-                }
-
-                return Ok(new { Token = result });
-            }
-            catch (Exception ex)
+            if (result == "Credenciales invalidas")
             {
                 return Unauthorized(new { message = "Credenciales incorrectas." });
             }
+
+            return Ok(new { Token = result });
         }
     }
 }

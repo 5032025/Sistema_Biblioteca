@@ -45,7 +45,7 @@ namespace BookApplication.Services
             }
 
 
-            var credencialesValidas = await _userRepository.CheckPasswordAsync(user.Id.ToString(), password);
+            var credencialesValidas = await _userRepository.CheckPasswordAsync(email, password);
 
             if (!credencialesValidas)
             {

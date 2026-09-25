@@ -1,9 +1,11 @@
 ﻿using Dominio_API.Clases;
 using Dominio_API.Interfaces;
+using Microsoft.AspNetCore.Http; 
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Security.Claims; 
 using System.Text;
 
 namespace Infraestructura_API.Persistencia.Repositorios
@@ -11,18 +13,27 @@ namespace Infraestructura_API.Persistencia.Repositorios
     public abstract class RepositorioBase<TEntity> : IBase<TEntity> where TEntity : EntidadBase
     {
         protected readonly AppDbContext _context;
-        public RepositorioBase(AppDbContext applicationDbContext)
+        private readonly IHttpContextAccessor _httpContextAccessor; // <-- Inyectar el accessor
+
+        public RepositorioBase(AppDbContext applicationDbContext, IHttpContextAccessor httpContextAccessor)
         {
-
             _context = applicationDbContext;
-
+            _httpContextAccessor = httpContextAccessor;
         }
 
-        //Create
+        // Create
         public virtual async Task<TEntity> AddAsync(TEntity entity)
         {
-            await _context.Set<TEntity>().AddAsync(entity);
+            // Extraer el usuario autenticado desde las claims del token
+            // Usamos ClaimTypes.Name que almacena el Email según tu JWTService, o puedes usar NameIdentifier para el ID
+            var usuarioCreacion = _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Name);
 
+            // Asignación automática de auditoría
+            entity.CreatedAt = DateTime.UtcNow;
+            entity.IsDeleted = false;
+            entity.CreatedBy = !string.IsNullOrEmpty(usuarioCreacion) ? usuarioCreacion : "Sistema";
+
+            await _context.Set<TEntity>().AddAsync(entity);
 
             var rowsAffected = await _context.SaveChangesAsync();
 
@@ -30,7 +41,6 @@ namespace Infraestructura_API.Persistencia.Repositorios
             {
                 return entity;
             }
-
 
             return null;
         }
@@ -73,33 +83,46 @@ namespace Infraestructura_API.Persistencia.Repositorios
             return query.Skip(skip).Take(take).AsQueryable();
         }
 
-
-        //Update
+        // Update
         public virtual async Task<TEntity> UpdateAsync(int id, TEntity entity)
         {
-            var existingEntity = await _context.Set<TEntity>().FirstOrDefaultAsync(c => c.Id == id);
-
-            if (existingEntity == null)
+            // 1. Asignamos el ID por seguridad al objeto que entra
+            var primaryKeyProperty = _context.Model.FindEntityType(typeof(TEntity))?.FindPrimaryKey().Properties.FirstOrDefault();
+            if (primaryKeyProperty != null)
             {
-                return null; 
+                var propertyInfo = typeof(TEntity).GetProperty(primaryKeyProperty.Name);
+                if (propertyInfo != null && propertyInfo.CanWrite)
+                {
+                    propertyInfo.SetValue(entity, id);
+                }
             }
 
-            
-            _context.Entry(existingEntity).CurrentValues.SetValues(entity);
+            // 2. Indicamos explícitamente a Entity Framework que el objeto está modificado
+            _context.Entry(entity).State = EntityState.Modified;
 
-           
-            existingEntity.Id = id;
+            // 3. Evitamos que EF intente modificar los campos de auditoría de creación si existen
+            var entry = _context.Entry(entity);
+            if (entry.Metadata.FindProperty("CreatedAt") != null)
+                entry.Property("CreatedAt").IsModified = false;
 
-            var rowsAffected = await _context.SaveChangesAsync();
+            if (entry.Metadata.FindProperty("CreatedBy") != null)
+                entry.Property("CreatedBy").IsModified = false;
 
-            if (rowsAffected > 0)
+            try
             {
-                return existingEntity;
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await _context.Set<TEntity>().AnyAsync(e => EF.Property<int>(e, primaryKeyProperty.Name) == id))
+                {
+                    return null;
+                }
+                throw;
             }
 
-            return null;
+            return entity;
         }
 
-       
     }
 }

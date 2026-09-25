@@ -8,5 +8,9 @@ namespace Dominio_API.Interfaces
     public interface ILibro : IBase<Libro>
     {
         Task<Libro?> GetBookWithAuthors(int id);
+
+        Task AddAuthorsToBookAsync(AutorLibro autorLibro);
+
+        Task AddCategoriesToBookAsync(LibroCategoria libroCategoria);
     }
 }

@@ -37,10 +37,10 @@ namespace Dominio_API.Interfaces
         /// <summary>
         /// Para validar que la contraseña pertenece al usuario.
         /// </summary>
-        /// <param name="userId"></param>
+        /// <param name="email"></param>
         /// <param name="password"></param>
         /// <returns></returns>
-        Task<bool> CheckPasswordAsync(string userId, string password);
+        Task<bool> CheckPasswordAsync(string email, string password);
 
         /// <summary>
         /// Para verificar si un usuario ya existe en la base de datos según su correo electrónico.
