@@ -3,4 +3,5 @@
   <Project Path="Biblioteca_API/Biblioteca_API.csproj" />
   <Project Path="Dominio_API/Dominio_API.csproj" />
   <Project Path="Infraestructura_API/Infraestructura_API.csproj" />
+  <Project Path="Sistema-Biblioteca.Tests/Sistema-Biblioteca.Tests.csproj" Id="eb9572e8-c570-4e38-aa9d-1288302672c4" />
 </Solution>

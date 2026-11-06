@@ -28,7 +28,7 @@ namespace Biblioteca_API.Controllers
         public async Task<IActionResult> GetByName(string name)
         {
             var categoria = await _categoriaServicio.GetCategoriaByNameAsync(name);
-            if (categoria == null) return NotFound();
+            if (categoria == null) return NotFound(new { message = $"La categoría '{name}' no existe." });
             return Ok(categoria);
         }
 
@@ -36,11 +36,19 @@ namespace Biblioteca_API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(CategoriaDto dto)
         {
+            // Validar si ya existe una categoría con el mismo nombre para evitar duplicados
+            var categoriaExistente = await _categoriaServicio.GetCategoriaByNameAsync(dto.Name);
+            if (categoriaExistente != null)
+            {
+                return Conflict(new { message = "Ya existe una categoría registrada con ese mismo nombre." });
+            }
+
             var categoria = new Categoria
             {
                 Name = dto.Name,
                 Description = dto.Description
             };
+
             var creada = await _categoriaServicio.CreateCategoriaAsync(categoria);
             return Ok(creada);
         }
@@ -49,13 +57,18 @@ namespace Biblioteca_API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, CategoriaDto dto)
         {
-            var categoria = new Categoria
+           
+            var actualizada = await _categoriaServicio.UpdateCategoriaAsync(id, new Categoria
             {
                 Name = dto.Name,
                 Description = dto.Description
-            };
-            var actualizada = await _categoriaServicio.UpdateCategoriaAsync(id, categoria);
-            if (actualizada == null) return NotFound();
+            });
+
+            if (actualizada == null)
+            {
+                return NotFound(new { message = $"No se puede actualizar. La categoría con ID {id} no existe." });
+            }
+
             return Ok(actualizada);
         }
 
@@ -64,7 +77,11 @@ namespace Biblioteca_API.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var eliminada = await _categoriaServicio.DeleteCategoriaAsync(id);
-            if (!eliminada) return NotFound();
+            if (!eliminada)
+            {
+                return NotFound(new { message = $"No se pudo eliminar. La categoría con ID {id} no existe." });
+            }
+
             return NoContent();
         }
     }

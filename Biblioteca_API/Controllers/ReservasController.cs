@@ -13,10 +13,11 @@ namespace Biblioteca_API.Controllers
     public class ReservasController : ControllerBase
     {
         private readonly ReservaServicio _reservaServicio;
-
-        public ReservasController(ReservaServicio reservaServicio)
+        private readonly LibroServicio _libroServicio; 
+        public ReservasController(ReservaServicio reservaServicio, LibroServicio libroServicio)
         {
             _reservaServicio = reservaServicio;
+            _libroServicio = libroServicio;
         }
 
         [HttpGet]
@@ -33,7 +34,7 @@ namespace Biblioteca_API.Controllers
         public async Task<IActionResult> GetById(int id)
         {
             var reserva = await _reservaServicio.GetReservaByIdAsync(id);
-            if (reserva == null) return NotFound();
+            if (reserva == null) return NotFound(new { message = $"La reserva con ID {id} no existe." });
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
             var isAdmin = User.IsInRole("Admin");
@@ -50,7 +51,22 @@ namespace Biblioteca_API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(ReservaDto dto)
         {
+            if (dto.BookIds == null || !dto.BookIds.Any())
+            {
+                return BadRequest(new { message = "La reserva debe incluir al menos un libro." });
+            }
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+
+            // Validar que cada ID de libro exista en el sistema usando el servicio correcto
+            foreach (var bookId in dto.BookIds)
+            {
+                var libroExiste = await _libroServicio.GetLibroByIdAsync(bookId);
+                if (libroExiste == null)
+                {
+                    return BadRequest(new { message = $"El libro con ID {bookId} no existe en el sistema." });
+                }
+            }
 
             var reserva = new Reserva
             {
@@ -62,7 +78,6 @@ namespace Biblioteca_API.Controllers
 
             var creada = await _reservaServicio.CreateReservaAsync(reserva);
 
-            // Asociar libros a la reserva
             foreach (var bookId in dto.BookIds)
             {
                 await _reservaServicio.AddBookToReserveAsync(new LibroReserva
@@ -80,7 +95,7 @@ namespace Biblioteca_API.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var eliminada = await _reservaServicio.DeleteReservaAsync(id);
-            if (!eliminada) return NotFound();
+            if (!eliminada) return NotFound(new { message = $"No se pudo eliminar. La reserva con ID {id} no existe." });
             return NoContent();
         }
     }

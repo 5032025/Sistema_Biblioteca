@@ -11,13 +11,17 @@ namespace Biblioteca_API.Controllers
     public class LibrosController : ControllerBase
     {
         private readonly LibroServicio _libroServicio;
-        private readonly CategoriaServicio _categoriaServicio; // 1. Declara el servicio aquí
+        private readonly CategoriaServicio _categoriaServicio;
+        private readonly AutorServicio _autorServicio;
 
-       
-        public LibrosController(LibroServicio libroServicio, CategoriaServicio categoriaServicio)
+        public LibrosController(
+            LibroServicio libroServicio,
+            CategoriaServicio categoriaServicio,
+            AutorServicio autorServicio)
         {
             _libroServicio = libroServicio;
-            _categoriaServicio = categoriaServicio; // 3. Inicialízalo
+            _categoriaServicio = categoriaServicio;
+            _autorServicio = autorServicio;
         }
 
         [HttpGet]
@@ -31,7 +35,7 @@ namespace Biblioteca_API.Controllers
         public async Task<IActionResult> GetById(int id)
         {
             var libro = await _libroServicio.GetLibroByIdAsync(id);
-            if (libro == null) return NotFound();
+            if (libro == null) return NotFound(new { message = $"El libro con ID {id} no existe." });
             return Ok(libro);
         }
 
@@ -39,57 +43,67 @@ namespace Biblioteca_API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(LibroDto dto)
         {
-            // 1. Validar que se proporcione al menos un autor
+            // 0. NUEVO: Validar si ya existe un libro registrado con el mismo título exacto
+            var librosExistentes = await _libroServicio.GetAllLibrosAsync(1, dto.Title);
+            bool libroDuplicado = librosExistentes.Any(l => l.Title.Equals(dto.Title, StringComparison.OrdinalIgnoreCase));
+
+            if (libroDuplicado)
+            {
+                return Conflict(new { message = $"Ya existe un libro registrado con el título '{dto.Title}'." });
+            }
+
+            // 1. Validar que se proporcione al menos un autor y una categoría
             if (dto.AutorIds == null || !dto.AutorIds.Any())
             {
-                return BadRequest("El libro debe tener al menos un autor asociado.");
+                return BadRequest(new { message = "El libro debe tener al menos un autor asociado." });
             }
 
-            // 2. Validar que se proporcione al menos una categoría
             if (dto.CategoriaIds == null || !dto.CategoriaIds.Any())
             {
-                return BadRequest("El libro debe tener al menos una categoría asociada.");
+                return BadRequest(new { message = "El libro debe tener al menos una categoría asociada." });
             }
 
-            // 3. Opcional: Obtener la primera categoría para asignarla como el "Genre" automáticamente
-            // (Asegúrate de inyectar ICategoria o el servicio correspondiente en tu controlador si no lo tienes)
-            var primeraCategoria = await _categoriaServicio.GetCategoriaByIdAsync(dto.CategoriaIds.First());
-
-            if (primeraCategoria == null)
+            // 2. Validar CADA ID de Autor individualmente
+            foreach (var autorId in dto.AutorIds)
             {
-                return BadRequest("Una de las categorías proporcionadas no existe.");
+                var autorExiste = await _autorServicio.GetAutorByIdAsync(autorId);
+                if (autorExiste == null)
+                {
+                    return BadRequest(new { message = $"El Autor con ID ({autorId}) no existe en el sistema." });
+                }
             }
+
+            // 3. Validar CADA ID de Categoría individualmente
+            foreach (var categoriaId in dto.CategoriaIds)
+            {
+                var categoriaExiste = await _categoriaServicio.GetCategoriaByIdAsync(categoriaId);
+                if (categoriaExiste == null)
+                {
+                    return BadRequest(new { message = $"La Categoría con ID ({categoriaId}) no existe en el sistema." });
+                }
+            }
+
+            var primeraCategoria = await _categoriaServicio.GetCategoriaByIdAsync(dto.CategoriaIds.First());
 
             var libro = new Libro
             {
                 Title = dto.Title,
-                Genre = primeraCategoria.Name, // Se asigna automáticamente el nombre de la categoría
+                Genre = primeraCategoria.Name,
                 PublicationYear = dto.PublicationYear,
                 Description = dto.Description,
                 Status = BookStatus.Available
             };
 
-            // 4. Crear el libro primero para obtener su ID generado
             var creado = await _libroServicio.CreateLibroAsync(libro);
 
-            // 5. Asociar cada autor al libro creado en la tabla intermedia
             foreach (var autorId in dto.AutorIds)
             {
-                await _libroServicio.AddAuthorsToBookAsync(new AutorLibro
-                {
-                    BookId = creado.Id,
-                    AuthorId = autorId
-                });
+                await _libroServicio.AddAuthorsToBookAsync(new AutorLibro { BookId = creado.Id, AuthorId = autorId });
             }
 
-            // 6. Asociar cada categoría al libro creado en la tabla intermedia
             foreach (var categoriaId in dto.CategoriaIds)
             {
-                await _libroServicio.AddCategoriesToBookAsync(new LibroCategoria
-                {
-                    LibroId = creado.Id,
-                    CategoriaId = categoriaId
-                });
+                await _libroServicio.AddCategoriesToBookAsync(new LibroCategoria { LibroId = creado.Id, CategoriaId = categoriaId });
             }
 
             return Ok(creado);
@@ -107,7 +121,7 @@ namespace Biblioteca_API.Controllers
                 Description = dto.Description
             };
             var actualizado = await _libroServicio.UpdateLibroAsync(id, libro);
-            if (actualizado == null) return NotFound();
+            if (actualizado == null) return NotFound(new { message = $"No se puede actualizar. El libro con ID {id} no existe." });
             return Ok(actualizado);
         }
 
@@ -116,7 +130,7 @@ namespace Biblioteca_API.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var eliminado = await _libroServicio.DeleteLibroAsync(id);
-            if (!eliminado) return NotFound();
+            if (!eliminado) return NotFound(new { message = $"No se pudo eliminar. El libro con ID {id} no existe." });
             return NoContent();
         }
     }

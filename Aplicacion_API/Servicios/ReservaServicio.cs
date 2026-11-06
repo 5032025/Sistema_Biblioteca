@@ -47,5 +47,10 @@ namespace Aplicacion_API.Servicios
         {
             return await _reservaRepositorio.Delete(id);
         }
+
+        public static implicit operator ReservaServicio(LibroServicio v)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
